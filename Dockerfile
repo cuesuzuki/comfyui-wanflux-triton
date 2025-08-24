@@ -1,5 +1,5 @@
 # ===== Base: CUDA 12.8 (for Triton) =====
-ARG CUDA_TAG=12.8.1-cudnn-runtime-ubuntu22.04
+ARG CUDA_TAG=12.8.1-cudnn-devel-ubuntu22.04
 FROM nvidia/cuda:${CUDA_TAG}
 
 ARG DEBIAN_FRONTEND=noninteractive
