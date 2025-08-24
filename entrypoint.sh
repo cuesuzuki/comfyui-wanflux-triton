@@ -111,7 +111,8 @@ log "Starting ComfyUI :${COMFY_PORT} from ${COMFY_ROOT}"
 cd "${COMFY_ROOT}"
 nohup python3 main.py \
   --listen 0.0.0.0 --port "${COMFY_PORT}" \
-  > "${WORKSPACE}/logs/comfyui.log" 2>&1 &
+  --manager-weak-security \
+  > "${WORKSPACE}/logs/comfyui.log" 2&>1 &
 
 # 軽いヘルス待ち
 for i in {1..60}; do
