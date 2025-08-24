@@ -8,7 +8,7 @@ ARG PYVER=3.11
 # 基本ツール
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl wget git git-lfs ffmpeg aria2 tini \
-    build-essential pkg-config gnupg dirmngr procps \
+    build-essential pkg-config gnupg dirmngr procps cmake \
     libgl1 libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
