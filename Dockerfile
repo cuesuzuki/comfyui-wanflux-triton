@@ -36,7 +36,7 @@ RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu128 \
 
 # ===== Triton + Sage Attention =====
 RUN python3 -m pip install triton
-RUN python3 -m pip install git+https://github.com/CicholGricenchos/Sage-Attention.git
+RUN python3 -m pip install git+https://github.com/thu-ml/SageAttention.git
 
 # ===== スクリプト投入 =====
 WORKDIR /opt
