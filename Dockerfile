@@ -36,6 +36,7 @@ RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu128 \
 
 # ===== Triton =====
 RUN python3 -m pip install triton
+RUN python3 -m pip install trampoline
 
 # ===== スクリプト投入 =====
 WORKDIR /opt
