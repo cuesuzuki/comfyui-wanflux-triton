@@ -36,6 +36,7 @@ RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu128 \
 
 # ===== Triton + Sage Attention =====
 RUN python3 -m pip install triton
+ENV TORCH_CUDA_ARCH_LIST=8.9
 RUN python3 -m pip install git+https://github.com/thu-ml/SageAttention.git
 
 # ===== スクリプト投入 =====
