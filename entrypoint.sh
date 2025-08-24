@@ -27,9 +27,14 @@ if [ ! -d "${COMFY_ROOT}" ]; then
   log "ComfyUI cloned into ${COMFY_ROOT}"
 fi
 
-# 依存関係のインストール
+# 依存関係のインストール (torch等はDockerfileのバージョンを維持)
 log "Installing/checking ComfyUI requirements..."
-python3 -m pip install -r "${COMFY_ROOT}/requirements.txt" --upgrade
+python3 -m pip install -r "${COMFY_ROOT}/requirements.txt" --upgrade --no-deps torch torchvision torchaudio
+
+# === SageAttentionのインストール ===
+log "Installing SageAttention..."
+TORCH_CUDA_ARCH_LIST=8.9 python3 -m pip install git+https://github.com/thu-ml/SageAttention.git
+log "SageAttention installed."
 
 COMFY_PORT="${COMFY_PORT:-8188}"
 JUPYTER_PORT="${JUPYTER_PORT:-8888}"
