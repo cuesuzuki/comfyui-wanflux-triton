@@ -28,19 +28,15 @@ if [ ! -d "${COMFY_ROOT}" ]; then
 fi
 
 # === 依存関係のインストール ===
-# 旧実装は `-r ... --no-deps torch ...` の混在で、requirements 側の依存解決が抑止されていました。
 log "Installing/checking ComfyUI requirements..."
 python3 -m pip install --no-cache-dir -r "${COMFY_ROOT}/requirements.txt"
-# torch/vision/audio はベースイメージに含まれるが、不足時は上書き（CUDA12系に合う版が入ります）
 python3 -m pip install --no-cache-dir --upgrade torch torchvision torchaudio || true
 
-# === 不足ライブラリの追加インストール（足りない時だけ入る想定）===
+# === 不足ライブラリ（足りない時だけ入る想定）===
 log "Installing additional dependencies..."
 python3 -m pip install --no-cache-dir kornia_rs pydantic_core mako typing_inspection annotated-types || true
 
-# === SageAttention（任意。まずは無効で安定起動を優先） ===
-# 有効化する場合：Dockerfile の ENV で TORCH_CUDA_ARCH_LIST="8.9" を既に設定済み。
-# 下の3行のコメントアウトを外すだけで、Ada(8.9)向けにビルドされます。
+# === SageAttention（任意・まずは無効） ===
 # log "Installing SageAttention..."
 # TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.9}" \
 #   python3 -m pip install --no-cache-dir git+https://github.com/thu-ml/SageAttention.git
@@ -91,7 +87,6 @@ if [ "${ALWAYS_DL}" = "1" ]; then
     log "wipe models/"
     rm -rf "${COMFY_ROOT}/models"/* || true
   fi
-  # 必要なモデルフォルダを作成
   mkdir -p \
     "${COMFY_ROOT}"/models/{checkpoints,diffusion_models,text_encoders,vae,clip_vision,loras}
 
@@ -116,12 +111,11 @@ nohup jupyter lab \
   "${JUPY_ARGS[@]}" \
   > "${WORKSPACE}/logs/jupyter.log" 2>&1 &
 
-# === ComfyUI 起動 ===
+# === ComfyUI 起動（※ 引数から --manager-weak-security を削除）===
 log "Starting ComfyUI :${COMFY_PORT} from ${COMFY_ROOT}"
 cd "${COMFY_ROOT}"
 nohup python3 main.py \
   --listen 0.0.0.0 --port "${COMFY_PORT}" \
-  --manager-weak-security \
   > "${WORKSPACE}/logs/comfyui.log" 2>&1 &
 
 # 軽いヘルス待ち（最大 ~120秒）
