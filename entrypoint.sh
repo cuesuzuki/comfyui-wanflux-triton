@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/-bin/env bash
 set -Eeuo pipefail
 export PIP_ROOT_USER_ACTION=ignore
 
@@ -30,6 +30,10 @@ fi
 # 依存関係のインストール (torch等はDockerfileのバージョンを維持)
 log "Installing/checking ComfyUI requirements..."
 python3 -m pip install -r "${COMFY_ROOT}/requirements.txt" --upgrade --no-deps torch torchvision torchaudio
+
+# === 不足ライブラリの追加インストール ===
+log "Installing additional dependencies..."
+python3 -m pip install kornia_rs pydantic_core mako typing_inspection annotated-types
 
 # === SageAttentionのインストール ===
 log "Installing SageAttention..."
@@ -68,7 +72,7 @@ if [ "${INSTALL_VHS}" = "1" ]; then
   if [ ! -d "${VHS_DIR}" ]; then
     log "Installing ComfyUI-VideoHelperSuite"
     git clone --depth=1 https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
-      "${VHS_DIR}" || warn "VHS: git clone failed"
+      "${VHS_DIR}" || warn "VHS: pip install requirements failed"
   else
     log "ComfyUI-VideoHelperSuite already present"
   fi
@@ -84,7 +88,7 @@ if [ "${ALWAYS_DL}" = "1" ]; then
   fi
   # 必要なモデルフォルダを作成
   mkdir -p \
-    "${COMFY_ROOT}"/models/{checkpoints,diffusion_models,text_encoders,vae,clip_vision}
+    "${COMFY_ROOT}"/models/{checkpoints,diffusion_models,text_encoders,vae,clip_vision,loras}
 
   log "setup_models.sh (start)"
   /opt/bootstrap/setup_models.sh
@@ -111,7 +115,8 @@ log "Starting ComfyUI :${COMFY_PORT} from ${COMFY_ROOT}"
 cd "${COMFY_ROOT}"
 nohup python3 main.py \
   --listen 0.0.0.0 --port "${COMFY_PORT}" \
-  > "${WORKSPACE}/logs/comfyui.log" 2&>1 &
+  --manager-weak-security \
+  > "${WORKSPACE}/logs/comfyui.log" 2>&1 &
 
 # 軽いヘルス待ち
 for i in {1..60}; do
