@@ -1,54 +1,35 @@
-# ===== Base: CUDA 12.8 (for Triton) =====
-ARG CUDA_TAG=12.8.1-cudnn-devel-ubuntu22.04
-FROM nvidia/cuda:${CUDA_TAG}
+# ベース：PyTorch + CUDA 12.1 ランタイム（RunPod/NVIDIA環境向け）
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
 
-ARG DEBIAN_FRONTEND=noninteractive
-ARG PYVER=3.11
+ENV DEBIAN_FRONTEND=noninteractive \
+    PIP_ROOT_USER_ACTION=ignore \
+    PYTHONUNBUFFERED=1 \
+    WORKSPACE=/workspace \
+    COMFY_PORT=8188 \
+    JUPYTER_PORT=8888 \
+    TORCH_CUDA_ARCH_LIST="8.9"
 
-# 基本ツール
+# 必要ツール・ライブラリ
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl wget git git-lfs ffmpeg aria2 tini \
-    build-essential pkg-config gnupg dirmngr procps cmake \
-    libgl1 libglib2.0-0 \
- && rm -rf /var/lib/apt/lists/*
+      tini curl ca-certificates git ffmpeg aria2 \
+      build-essential python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# ===== Python ${PYVER} =====
-RUN set -eux; \
-    mkdir -p /etc/apt/keyrings; \
-    curl -fsSL 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xBA6932366A755776' \
-      | gpg --dearmor -o /etc/apt/keyrings/deadsnakes.gpg; \
-    echo 'deb [signed-by=/etc/apt/keyrings/deadsnakes.gpg] http://ppa.launchpad.net/deadsnakes/ppa/ubuntu jammy main' \
-      > /etc/apt/sources.list.d/deadsnakes-ppa.list; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends python${PYVER} python${PYVER}-dev python${PYVER}-venv; \
-    ln -sf /usr/bin/python${PYVER} /usr/bin/python3; \
-    curl -Ls https://bootstrap.pypa.io/get-pip.py | python3; \
-    python3 -m pip install -U pip wheel setuptools; \
-    rm -rf /var/lib/apt/lists/*
+# JupyterLab
+RUN python -m pip install --upgrade pip && \
+    python -m pip install --no-cache-dir jupyterlab
 
-ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_ROOT_USER_ACTION=ignore
-ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/dist-packages/torch/lib:${LD_LIBRARY_PATH}
+# ディレクトリとログ領域
+RUN mkdir -p /opt/bootstrap /usr/local/bin /workspace /runpod-volume /workspace/logs
 
-# ===== PyTorch（cu128 build）+ Jupyter =====
-RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu128 \
-    torch torchvision torchaudio --upgrade \
- && python3 -m pip install jupyterlab
-
-# ===== Triton =====
-RUN python3 -m pip install triton
-RUN python3 -m pip install trampoline
-
-# ===== スクリプト投入 =====
-WORKDIR /opt
+# エントリポイント関連スクリプト配置
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY setup_models.sh /opt/bootstrap/setup_models.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh /opt/bootstrap/setup_models.sh
 
-ENV ALWAYS_DL=1 \
-    CLEAR_MODELS_BEFORE_DL=0 \
-    INSTALL_MANAGER=1
-
+# ポート公開（ComfyUI / Jupyter）
 EXPOSE 8188 8888
 
-ENTRYPOINT ["/usr/bin/tini","--"]
+# Tini を subreaper として起動（ゾンビ回収の警告を抑制）
+ENTRYPOINT ["/usr/bin/tini","-s","--"]
 CMD ["/usr/local/bin/entrypoint.sh"]

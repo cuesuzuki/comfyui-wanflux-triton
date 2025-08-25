@@ -1,4 +1,4 @@
-#!/usr/-bin/env bash
+#!/usr/bin/env bash
 set -Eeuo pipefail
 export PIP_ROOT_USER_ACTION=ignore
 
@@ -27,18 +27,23 @@ if [ ! -d "${COMFY_ROOT}" ]; then
   log "ComfyUI cloned into ${COMFY_ROOT}"
 fi
 
-# 依存関係のインストール (torch等はDockerfileのバージョンを維持)
+# === 依存関係のインストール ===
+# 旧実装は `-r ... --no-deps torch ...` の混在で、requirements 側の依存解決が抑止されていました。
 log "Installing/checking ComfyUI requirements..."
-python3 -m pip install -r "${COMFY_ROOT}/requirements.txt" --upgrade --no-deps torch torchvision torchaudio
+python3 -m pip install --no-cache-dir -r "${COMFY_ROOT}/requirements.txt"
+# torch/vision/audio はベースイメージに含まれるが、不足時は上書き（CUDA12系に合う版が入ります）
+python3 -m pip install --no-cache-dir --upgrade torch torchvision torchaudio || true
 
-# === 不足ライブラリの追加インストール ===
+# === 不足ライブラリの追加インストール（足りない時だけ入る想定）===
 log "Installing additional dependencies..."
-python3 -m pip install kornia_rs pydantic_core mako typing_inspection annotated-types
+python3 -m pip install --no-cache-dir kornia_rs pydantic_core mako typing_inspection annotated-types || true
 
-# === SageAttentionのインストール ===
-log "Installing SageAttention..."
-TORCH_CUDA_ARCH_LIST=8.9 python3 -m pip install git+https://github.com/thu-ml/SageAttention.git
-log "SageAttention installed."
+# === SageAttention（任意。まずは無効で安定起動を優先） ===
+# 有効化する場合：Dockerfile の ENV で TORCH_CUDA_ARCH_LIST="8.9" を既に設定済み。
+# 下の3行のコメントアウトを外すだけで、Ada(8.9)向けにビルドされます。
+# log "Installing SageAttention..."
+# TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.9}" \
+#   python3 -m pip install --no-cache-dir git+https://github.com/thu-ml/SageAttention.git
 
 COMFY_PORT="${COMFY_PORT:-8188}"
 JUPYTER_PORT="${JUPYTER_PORT:-8888}"
@@ -62,7 +67,7 @@ if [ "${INSTALL_MANAGER}" = "1" ]; then
   else
     log "ComfyUI-Manager already present"
   fi
-  python3 -m pip install -r "${MANAGER_DIR}/requirements.txt" \
+  python3 -m pip install --no-cache-dir -r "${MANAGER_DIR}/requirements.txt" \
     || warn "ComfyUI-Manager: pip install requirements failed"
 fi
 
@@ -72,11 +77,11 @@ if [ "${INSTALL_VHS}" = "1" ]; then
   if [ ! -d "${VHS_DIR}" ]; then
     log "Installing ComfyUI-VideoHelperSuite"
     git clone --depth=1 https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git \
-      "${VHS_DIR}" || warn "VHS: pip install requirements failed"
+      "${VHS_DIR}" || warn "VHS: git clone failed"
   else
     log "ComfyUI-VideoHelperSuite already present"
   fi
-  python3 -m pip install -r "${VHS_DIR}/requirements.txt" \
+  python3 -m pip install --no-cache-dir -r "${VHS_DIR}/requirements.txt" \
     || warn "VHS: pip install requirements failed"
 fi
 
@@ -84,7 +89,7 @@ fi
 if [ "${ALWAYS_DL}" = "1" ]; then
   if [ "${CLEAR_MODELS_BEFORE_DL}" = "1" ]; then
     log "wipe models/"
-    rm -rf "${COMFY_ROOT}/models"/*
+    rm -rf "${COMFY_ROOT}/models"/* || true
   fi
   # 必要なモデルフォルダを作成
   mkdir -p \
@@ -111,6 +116,7 @@ nohup jupyter lab \
   "${JUPY_ARGS[@]}" \
   > "${WORKSPACE}/logs/jupyter.log" 2>&1 &
 
+# === ComfyUI 起動 ===
 log "Starting ComfyUI :${COMFY_PORT} from ${COMFY_ROOT}"
 cd "${COMFY_ROOT}"
 nohup python3 main.py \
@@ -118,13 +124,16 @@ nohup python3 main.py \
   --manager-weak-security \
   > "${WORKSPACE}/logs/comfyui.log" 2>&1 &
 
-# 軽いヘルス待ち
+# 軽いヘルス待ち（最大 ~120秒）
 for i in {1..60}; do
   sleep 2
-  curl -fsS "http://127.0.0.1:${COMFY_PORT}" >/dev/null 2>&1 && break || true
+  if curl -fsS "http://127.0.0.1:${COMFY_PORT}" >/dev/null 2>&1; then
+    break
+  fi
 done
 
 log "Jupyter:  http://<pod>:${JUPYTER_PORT}/$( [ -n "${JUPYTER_TOKEN}" ] && echo '?token='${JUPYTER_TOKEN} )"
 log "ComfyUI:  http://<pod>:${COMFY_PORT}/"
 
+# ログをフォアグラウンド監視
 exec tail -F "${WORKSPACE}/logs/comfyui.log" "${WORKSPACE}/logs/jupyter.log"
